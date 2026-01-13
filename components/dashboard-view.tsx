@@ -167,9 +167,19 @@ export default function DashboardView() {
         setUploading(true);
         showToast('success', 'Processing encryption...'); // Immediate feedback
 
+        // Give UI time to render loading state on mobile
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         try {
             // Encrypt before upload
-            const encryptedBlob = await encryptFile(file);
+            let encryptedBlob;
+            try {
+                encryptedBlob = await encryptFile(file);
+            } catch (encError) {
+                console.error("Encryption Memory Error", encError);
+                throw new Error("Phone ran out of memory during encryption. Try a smaller file.");
+            }
+
             const filePath = `${user.id}/${file.name}`;
 
             const { error } = await supabase.storage.from(bucketName).upload(filePath, encryptedBlob, {
