@@ -43,9 +43,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (error) {
             console.error("Error signing out:", error);
         } finally {
+            // Force clear any persisting tokens
+            localStorage.clear(); // Clears all local storage to be safe
+
             setUser(null);
             setSession(null);
-            window.location.href = "/";
+            router.replace("/");
+            router.refresh(); // Ensure server components re-validate if any
         }
     };
 
