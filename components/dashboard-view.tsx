@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabase";
-import { Upload, File, Trash2, Download, LogOut, Loader2, X, ShieldCheck } from "lucide-react";
+import { Upload, File, Trash2, Download, LogOut, Loader2, X, ShieldCheck, Eye, FileText, Archive, FileImage, Filter, Grid, Film } from "lucide-react";
 import { useRouter } from "next/navigation";
 import CryptoJS from "crypto-js";
 import AdminPanel from "./admin-panel";
@@ -27,6 +27,14 @@ export default function DashboardView() {
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [userProfile, setUserProfile] = useState<{ role: string, status: string } | null>(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
+
+    // Filter State
+    const [activeFilter, setActiveFilter] = useState<'all' | 'image' | 'video' | 'document' | 'archive'>('all');
+
+    // Preview State
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [previewName, setPreviewName] = useState<string | null>(null);
+    const [previewing, setPreviewing] = useState(false);
 
     // Use a unique key for encryption per user (In a real app, this should be managed more securely, e.g., user input or KMS)
     const ENCRYPTION_KEY = user?.id || 'default-secret-key';
@@ -145,14 +153,14 @@ export default function DashboardView() {
 
 
     // Upload Logic
-    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB Limit for Client-Side Encryption stability
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // Increased to 50MB to accommodate small videos
 
     const handleFileUpload = async (file: File) => {
         if (!user) return;
 
         // 1. File Size Check
         if (file.size > MAX_FILE_SIZE) {
-            showToast('error', `File too large (${formatSize(file.size)}). Limit is 20MB for browser encryption.`);
+            showToast('error', `File too large (${formatSize(file.size)}). Limit is 50MB for browser encryption.`);
             return;
         }
 
@@ -181,6 +189,59 @@ export default function DashboardView() {
         } finally {
             setUploading(false);
         }
+    };
+
+    // Preview Logic
+    const handlePreview = async (e: React.MouseEvent, fileName: string, originalType: string = 'image/png') => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Starting preview for:", fileName);
+
+        setPreviewing(true);
+        setPreviewName(fileName);
+
+        try {
+            const { data, error } = await supabase.storage
+                .from(bucketName)
+                .download(`${user?.id}/${fileName}`);
+
+            if (error) throw error;
+
+            let finalBlob = data;
+            try {
+                finalBlob = await decryptFile(data);
+            } catch (e) {
+                console.warn("Decryption failed for preview", e);
+            }
+
+            // Determine Blob type for preview
+            const isPdf = fileName.toLowerCase().endsWith('.pdf') || originalType === 'application/pdf';
+            const isTxt = fileName.toLowerCase().endsWith('.txt');
+            const isVideo = fileName.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/) || originalType.startsWith('video/');
+
+            let blobType = originalType;
+            if (isPdf) blobType = 'application/pdf';
+            else if (isTxt) blobType = 'text/plain';
+            else if (isVideo) blobType = originalType || 'video/mp4';
+
+            const url = window.URL.createObjectURL(new Blob([finalBlob], { type: blobType }));
+            setPreviewUrl(url);
+        } catch (error: any) {
+            console.error("Preview Error", error);
+            showToast('error', "Failed to load preview");
+            setPreviewName(null); // Close modal on error
+        } finally {
+            setPreviewing(false);
+        }
+    };
+
+    const closePreview = () => {
+        if (previewUrl) {
+            window.URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl(null);
+        setPreviewName(null);
+        setPreviewing(false);
     };
 
     // Drag and Drop handlers
@@ -260,6 +321,24 @@ export default function DashboardView() {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
+
+    // Filter Logic
+    const filteredFiles = files.filter(file => {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        const type = file.metadata?.originalType || '';
+
+        const isImage = type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+        const isVideo = type.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext);
+        const isPdf = type === 'application/pdf' || ext === 'pdf';
+        const isDoc = ['doc', 'docx', 'txt', 'rtf'].includes(ext);
+        const isArchive = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext);
+
+        if (activeFilter === 'image') return isImage;
+        if (activeFilter === 'video') return isVideo;
+        if (activeFilter === 'document') return isDoc || isPdf;
+        if (activeFilter === 'archive') return isArchive;
+        return true; // 'all'
+    });
 
     // 🔄 LOADING CHECK 🔄
     if (loadingProfile) {
@@ -394,47 +473,105 @@ export default function DashboardView() {
                     )}
                 </div>
 
+                {/* Filter Tabs */}
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                    {[
+                        { id: 'all', label: 'All Files', icon: Grid },
+                        { id: 'image', label: 'Images', icon: FileImage },
+                        { id: 'video', label: 'Videos', icon: Film },
+                        { id: 'document', label: 'Documents', icon: FileText },
+                        { id: 'archive', label: 'Archives', icon: Archive },
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveFilter(tab.id as any)}
+                            className={`
+                                flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap
+                                ${activeFilter === tab.id
+                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                                    : 'glass-panel text-gray-400 hover:text-white hover:bg-white/10'}
+                            `}
+                        >
+                            <tab.icon className="w-4 h-4" />
+                            <span>{tab.label}</span>
+                        </button>
+                    ))}
+                </div>
+
                 {/* Files Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {loadingFiles ? (
                         [1, 2, 3].map((i) => (
                             <div key={i} className="h-32 glass-panel rounded-xl animate-pulse bg-white/5" />
                         ))
-                    ) : files.length === 0 ? (
+                    ) : filteredFiles.length === 0 ? (
                         <div className="col-span-full text-center py-20 text-gray-500">
-                            No files found. Upload something to the vault.
+                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Filter className="w-8 h-8 text-gray-600" />
+                            </div>
+                            <p>No files found in this category.</p>
                         </div>
                     ) : (
-                        files.map((file) => (
-                            <div key={file.id || file.name} className="glass-panel p-5 rounded-xl group hover:bg-white/10 transition-all hover:scale-[1.02] flex flex-col justify-between h-40 relative overflow-hidden">
-                                <div className="flex justify-between items-start">
-                                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-300">
-                                        <File className="w-6 h-6" />
-                                    </div>
-                                    <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleDownload(file.name, file.metadata?.originalType)} className="p-2 hover:bg-white/20 rounded-lg text-gray-300 hover:text-white" title="Download & Decrypt">
-                                            <Download className="w-5 h-5" />
-                                        </button>
-                                        <button onClick={() => handleDelete(file.name)} className="p-2 hover:bg-red-500/20 rounded-lg text-gray-300 hover:text-red-400" title="Delete">
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
+                        filteredFiles.map((file) => {
+                            // File Type Detection
+                            const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                            const type = file.metadata?.originalType || '';
 
-                                <div>
-                                    <h3 className="text-white font-medium truncate mb-1" title={file.name}>{file.name}</h3>
-                                    <div className="flex justify-between text-xs text-gray-400">
-                                        <span>{file.metadata ? formatSize(file.metadata.size) : 'Unknown'}</span>
-                                        <span>{new Date(file.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                    {file.metadata?.encrypted && (
-                                        <div className="mt-2 text-[10px] uppercase tracking-wider text-green-500/70 border-t border-white/5 pt-2 flex items-center gap-1">
-                                            <ShieldCheck className="w-3 h-3" /> Encrypted
+                            const isImage = type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+                            const isVideo = type.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext);
+                            const isPdf = type === 'application/pdf' || ext === 'pdf';
+                            const isDoc = ['doc', 'docx', 'txt', 'rtf'].includes(ext);
+                            const isArchive = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext);
+
+                            // Determine Icon & Color
+                            let Icon = File;
+                            let colorClass = 'bg-blue-500/20 text-blue-300';
+
+                            if (isImage) { Icon = FileImage; colorClass = 'bg-purple-500/20 text-purple-300'; }
+                            else if (isVideo) { Icon = Film; colorClass = 'bg-pink-500/20 text-pink-300'; }
+                            else if (isPdf) { Icon = FileText; colorClass = 'bg-red-500/20 text-red-300'; }
+                            else if (isDoc) { Icon = FileText; colorClass = 'bg-indigo-500/20 text-indigo-300'; }
+                            else if (isArchive) { Icon = Archive; colorClass = 'bg-yellow-500/20 text-yellow-300'; }
+
+                            // Check if previewable (Image, PDF, Video, or Text)
+                            const isPreviewable = isImage || isPdf || isDoc || isVideo;
+
+                            return (
+                                <div key={file.id || file.name} className="glass-panel p-5 rounded-xl group hover:bg-white/10 transition-all hover:scale-[1.02] flex flex-col justify-between h-40 relative overflow-hidden">
+                                    <div className="flex justify-between items-start">
+                                        <div className={`p-2 rounded-lg ${colorClass}`}>
+                                            <Icon className="w-6 h-6" />
                                         </div>
-                                    )}
+                                        <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                            {isPreviewable && (
+                                                <button onClick={(e) => handlePreview(e, file.name, file.metadata?.originalType)} className="p-2 hover:bg-white/20 rounded-lg text-gray-300 hover:text-white" title="View">
+                                                    <Eye className="w-5 h-5" />
+                                                </button>
+                                            )}
+                                            <button onClick={() => handleDownload(file.name, file.metadata?.originalType)} className="p-2 hover:bg-white/20 rounded-lg text-gray-300 hover:text-white" title="Download & Decrypt">
+                                                <Download className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={() => handleDelete(file.name)} className="p-2 hover:bg-red-500/20 rounded-lg text-gray-300 hover:text-red-400" title="Delete">
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-white font-medium truncate mb-1" title={file.name}>{file.name}</h3>
+                                        <div className="flex justify-between text-xs text-gray-400">
+                                            <span>{file.metadata ? formatSize(file.metadata.size) : 'Unknown'}</span>
+                                            <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                        {file.metadata?.encrypted && (
+                                            <div className="mt-2 text-[10px] uppercase tracking-wider text-green-500/70 border-t border-white/5 pt-2 flex items-center gap-1">
+                                                <ShieldCheck className="w-3 h-3" /> Encrypted
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))
+                            )
+                        })
                     )}
                 </div>
             </main>
@@ -444,6 +581,80 @@ export default function DashboardView() {
                 <div className={`fixed bottom-8 right-8 p-4 rounded-xl glass-panel border-l-4 ${toast.type === 'success' ? 'border-l-green-500 text-green-200' : 'border-l-red-500 text-red-200'} shadow-lg animate-float flex items-center gap-3 z-50`}>
                     <span>{toast.message}</span>
                     <button onClick={() => setToast(null)} className="hover:text-white"><X className="w-4 h-4" /></button>
+                </div>
+            )}
+
+            {/* Preview Modal */}
+            {(previewName) && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={closePreview}>
+                    <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center p-2" onClick={(e) => e.stopPropagation()}>
+
+                        <div className="absolute top-[-40px] right-0 flex gap-4">
+                            <a
+                                href={previewUrl || '#'}
+                                download={previewName}
+                                className={`text-white hover:text-blue-400 transition-colors ${!previewUrl ? 'invisible' : ''}`}
+                                title="Download Original"
+                            >
+                                <Download className="w-6 h-6" />
+                            </a>
+                            <button onClick={closePreview} className="text-white hover:text-red-400 transition-colors">
+                                <X className="w-8 h-8" />
+                            </button>
+                        </div>
+
+                        {previewing && !previewUrl ? (
+                            <div className="flex flex-col items-center gap-4 text-white">
+                                <Loader2 className="w-12 h-12 animate-spin text-blue-400" />
+                                <p>Decrypting & Loading...</p>
+                            </div>
+                        ) : (
+                            // Content Switcher based on type
+                            previewName.toLowerCase().endsWith('.pdf') ? (
+                                <iframe
+                                    src={previewUrl!}
+                                    className="w-full h-[80vh] rounded-lg shadow-2xl border border-white/10 bg-white"
+                                    title="PDF Preview"
+                                />
+                            ) : previewName.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/) ? (
+                                <video
+                                    src={previewUrl!}
+                                    controls
+                                    className="max-w-full max-h-[85vh] rounded-lg shadow-2xl border border-white/10 bg-black"
+                                >
+                                    Your browser does not support the video tag.
+                                </video>
+                            ) : previewName.toLowerCase().match(/\.(txt|md|log)$/) ? (
+                                <iframe
+                                    src={previewUrl!}
+                                    className="w-full h-[80vh] rounded-lg shadow-2xl border border-white/10 bg-white"
+                                    title="Text Preview"
+                                />
+                            ) : previewName.toLowerCase().match(/\.(doc|docx)$/) ? (
+                                <div className="glass-panel p-10 rounded-2xl flex flex-col items-center text-center">
+                                    <FileText className="w-20 h-20 text-blue-400 mb-4" />
+                                    <h2 className="text-xl font-bold text-white mb-2">Preview Not Supported</h2>
+                                    <p className="text-gray-400 mb-6">Word documents cannot be securely verified in the browser yet.</p>
+                                    <a
+                                        href={previewUrl!}
+                                        download={previewName}
+                                        className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all"
+                                    >
+                                        <Download className="w-5 h-5" /> Download to View
+                                    </a>
+                                </div>
+                            ) : (
+                                <img
+                                    src={previewUrl!}
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; showToast('error', 'Image data corrupted or invalid'); }}
+                                    alt="Decrypted Preview"
+                                    className="max-w-full max-h-[85vh] rounded-lg shadow-2xl border border-white/10"
+                                />
+                            )
+                        )}
+
+                        {!previewing && <p className="text-gray-400 mt-4 text-sm">{previewName}</p>}
+                    </div>
                 </div>
             )}
         </div>
