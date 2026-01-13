@@ -351,7 +351,7 @@ export default function DashboardView() {
                 {/* Upload Zone */}
                 <div
                     className={`
-               relative glass-panel rounded-2xl text-center transition-all duration-300 border-dashed border-2
+               relative glass-panel rounded-2xl text-center transition-all duration-300 border-dashed border-2 flex flex-col items-center justify-center
                ${dragActive ? 'border-blue-400 bg-blue-500/10 scale-[1.02]' : 'border-white/20 hover:border-white/40'}
             `}
                     onDragEnter={handleDrag}
@@ -361,24 +361,23 @@ export default function DashboardView() {
                 >
                     <input
                         type="file"
-                        className="hidden"
-                        id="file-upload"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         onChange={(e) => {
                             if (e.target.files && e.target.files[0]) {
                                 handleFileUpload(e.target.files[0]);
-                                e.target.value = ''; // Reset input to allow re-uploading the same file
+                                e.target.value = ''; // Reset
                             }
                         }}
                     />
-                    <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4 w-full h-full p-10">
-                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:bg-white/10 transition-colors">
+                    <div className="flex flex-col items-center gap-4 w-full h-full p-10 pointer-events-none">
+                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-2 transition-colors">
                             {uploading ? <Loader2 className="w-8 h-8 animate-spin text-blue-400" /> : <Upload className="w-8 h-8 text-blue-400" />}
                         </div>
                         <div>
                             <h2 className="text-xl font-medium text-white mb-1">Tap or Drag to upload</h2>
                             <p className="text-gray-400 text-sm">Everything is encrypted before leaving your device</p>
                         </div>
-                    </label>
+                    </div>
                     {uploading && (
                         <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300 rounded-b-2xl" style={{ width: '100%' }} />
                     )}
