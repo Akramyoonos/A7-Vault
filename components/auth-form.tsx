@@ -84,7 +84,7 @@ export default function AuthForm() {
         <div className="w-full max-w-md p-8 rounded-2xl glass-panel animate-float">
             <div className="text-center mb-8">
                 <div className="mx-auto w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mb-6 backdrop-blur-md shadow-[0_0_30px_rgba(120,119,198,0.3)] overflow-hidden p-1 border border-white/20">
-                    <img src="/A7-Vault/logo.png" alt="A7 Vault Logo" className="w-full h-full object-cover rounded-full" />
+                    <img src="/logo.png" alt="A7 Vault Logo" className="w-full h-full object-cover rounded-full" />
                 </div>
                 <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
                     {view === 'sign_in' ? 'Welcome Back' : 'Create Account'}
