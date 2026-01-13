@@ -145,18 +145,28 @@ export default function DashboardView() {
 
 
     // Upload Logic
+    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB Limit for Client-Side Encryption stability
+
     const handleFileUpload = async (file: File) => {
         if (!user) return;
+
+        // 1. File Size Check
+        if (file.size > MAX_FILE_SIZE) {
+            showToast('error', `File too large (${formatSize(file.size)}). Limit is 20MB for browser encryption.`);
+            return;
+        }
+
         setUploading(true);
+        showToast('success', 'Processing encryption...'); // Immediate feedback
 
         try {
             // Encrypt before upload
             const encryptedBlob = await encryptFile(file);
-            const filePath = `${user.id}/${file.name}`; // Keep original name, content is encrypted
+            const filePath = `${user.id}/${file.name}`;
 
             const { error } = await supabase.storage.from(bucketName).upload(filePath, encryptedBlob, {
                 upsert: true,
-                contentType: 'application/encrypted', // Mark as encrypted
+                contentType: 'application/encrypted',
                 metadata: { originalType: file.type, encrypted: 'true' }
             });
 
@@ -166,7 +176,8 @@ export default function DashboardView() {
             showToast('success', `Encrypted & Uploaded ${file.name}`);
             fetchFiles();
         } catch (error: any) {
-            showToast('error', error.message);
+            console.error("Upload failed:", error);
+            showToast('error', error.message || "Upload failed. Try a smaller file.");
         } finally {
             setUploading(false);
         }
