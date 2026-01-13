@@ -351,7 +351,7 @@ export default function DashboardView() {
                 {/* Upload Zone */}
                 <div
                     className={`
-               relative glass-panel rounded-2xl p-10 text-center transition-all duration-300 border-dashed border-2
+               relative glass-panel rounded-2xl text-center transition-all duration-300 border-dashed border-2
                ${dragActive ? 'border-blue-400 bg-blue-500/10 scale-[1.02]' : 'border-white/20 hover:border-white/40'}
             `}
                     onDragEnter={handleDrag}
@@ -363,14 +363,19 @@ export default function DashboardView() {
                         type="file"
                         className="hidden"
                         id="file-upload"
-                        onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
+                        onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                                handleFileUpload(e.target.files[0]);
+                                e.target.value = ''; // Reset input to allow re-uploading the same file
+                            }
+                        }}
                     />
-                    <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4">
+                    <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-4 w-full h-full p-10">
                         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:bg-white/10 transition-colors">
                             {uploading ? <Loader2 className="w-8 h-8 animate-spin text-blue-400" /> : <Upload className="w-8 h-8 text-blue-400" />}
                         </div>
                         <div>
-                            <h2 className="text-xl font-medium text-white mb-1">Drag file to upload</h2>
+                            <h2 className="text-xl font-medium text-white mb-1">Tap or Drag to upload</h2>
                             <p className="text-gray-400 text-sm">Everything is encrypted before leaving your device</p>
                         </div>
                     </label>
@@ -396,12 +401,12 @@ export default function DashboardView() {
                                     <div className="p-2 bg-blue-500/20 rounded-lg text-blue-300">
                                         <File className="w-6 h-6" />
                                     </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleDownload(file.name, file.metadata?.originalType)} className="p-1.5 hover:bg-white/20 rounded-lg text-gray-300 hover:text-white" title="Download & Decrypt">
-                                            <Download className="w-4 h-4" />
+                                    <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => handleDownload(file.name, file.metadata?.originalType)} className="p-2 hover:bg-white/20 rounded-lg text-gray-300 hover:text-white" title="Download & Decrypt">
+                                            <Download className="w-5 h-5" />
                                         </button>
-                                        <button onClick={() => handleDelete(file.name)} className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-300 hover:text-red-400" title="Delete">
-                                            <Trash2 className="w-4 h-4" />
+                                        <button onClick={() => handleDelete(file.name)} className="p-2 hover:bg-red-500/20 rounded-lg text-gray-300 hover:text-red-400" title="Delete">
+                                            <Trash2 className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>

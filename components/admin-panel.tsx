@@ -116,7 +116,7 @@ export default function AdminPanel() {
 
     return (
         <div className="glass-panel p-6 rounded-2xl mb-8 border border-purple-500/20">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-500/20 rounded-lg">
                         <ShieldAlert className="w-6 h-6 text-purple-300" />
@@ -128,7 +128,7 @@ export default function AdminPanel() {
                 </div>
                 <button
                     onClick={() => setIsAddingUser(!isAddingUser)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
                 >
                     <UserPlus className="w-4 h-4" />
                     {isAddingUser ? 'Cancel' : 'Add User'}
@@ -167,7 +167,7 @@ export default function AdminPanel() {
             )}
 
             <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-400">
+                <table className="w-full text-left text-sm text-gray-400 min-w-[600px]">
                     <thead className="text-xs uppercase bg-white/5 text-gray-300">
                         <tr>
                             <th className="px-4 py-3 rounded-l-lg">User</th>
