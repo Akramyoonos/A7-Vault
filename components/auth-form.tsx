@@ -42,7 +42,7 @@ export default function AuthForm() {
         try {
             if (view === "sign_up") {
                 const { error } = await supabase.auth.signUp({
-                    email,
+                    email: email.trim(),
                     password,
                     options: {
                         data: {
@@ -57,16 +57,16 @@ export default function AuthForm() {
             } else {
                 if (mode === "password") {
                     const { error } = await supabase.auth.signInWithPassword({
-                        email,
+                        email: email.trim(),
                         password,
                     });
                     if (error) throw error;
                     router.push("/dashboard");
                 } else {
                     const { error } = await supabase.auth.signInWithOtp({
-                        email,
+                        email: email.trim(),
                         options: {
-                            emailRedirectTo: `${window.location.origin}/auth/callback`,
+                            emailRedirectTo: `${window.location.origin}/auth/callback`, // Note: Verify this redirect URL in Supabase Dashboard
                         },
                     });
                     if (error) throw error;
