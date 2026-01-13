@@ -112,25 +112,64 @@ export default function DashboardView() {
         if (user && userProfile?.status === 'approved') fetchFiles();
     }, [user, userProfile, fetchFiles]);
 
-    // Encryption Helper (Same as before)
-    const encryptFile = (file: File): Promise<Blob> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const wordArray = CryptoJS.lib.WordArray.create(reader.result as any);
-                const encrypted = CryptoJS.AES.encrypt(wordArray, ENCRYPTION_KEY).toString();
-                resolve(new Blob([encrypted], { type: 'text/plain' }));
-            };
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(file);
-        });
+    // Encryption Helper (Web Crypto API - High Performance)
+    const getCryptoKey = async (secret: string) => {
+        const encoder = new TextEncoder();
+        const keyData = encoder.encode(secret);
+        const hash = await crypto.subtle.digest("SHA-256", keyData);
+        return crypto.subtle.importKey("raw", hash, "AES-GCM", false, ["encrypt", "decrypt"]);
+    };
+
+    const encryptFile = async (file: File): Promise<Blob> => {
+        // Use Native Web Crypto for performance & low memory usage
+        const key = await getCryptoKey(ENCRYPTION_KEY);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const fileBuffer = await file.arrayBuffer();
+
+        const encryptedBuffer = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv: iv },
+            key,
+            fileBuffer
+        );
+
+        // Combine IV (12 bytes) + Ciphertext
+        return new Blob([iv, encryptedBuffer], { type: 'application/octet-stream' });
     };
 
     const decryptFile = async (blob: Blob): Promise<Blob> => {
-        const text = await blob.text();
-        const decrypted = CryptoJS.AES.decrypt(text, ENCRYPTION_KEY);
-        const typedArray = convertWordArrayToUint8Array(decrypted);
-        return new Blob([typedArray]);
+        try {
+            // Try Web Crypto (AES-GCM) first - Fast & Memory Efficient
+            const buffer = await blob.arrayBuffer();
+
+            // Check if it's likely a Legacy CryptoJS file (Base64 string)
+            // Legacy files start with "U2FsdGVkX1" (Salted__ in Base64)
+            const firstBytes = new Uint8Array(buffer.slice(0, 10));
+            const header = String.fromCharCode(...firstBytes);
+
+            if (header === 'U2FsdGVkX1') {
+                throw new Error("Legacy Format Detected");
+            }
+
+            const key = await getCryptoKey(ENCRYPTION_KEY);
+            const iv = buffer.slice(0, 12);
+            const data = buffer.slice(12);
+
+            const decryptedBuffer = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: new Uint8Array(iv) },
+                key,
+                data
+            );
+
+            return new Blob([decryptedBuffer]);
+        } catch (e: any) {
+            // Fallback to Legacy CryptoJS (Slow, High Memory)
+            // Used for files uploaded before this update
+            console.warn("Attempting Legacy Decryption...", e.message);
+            const text = await blob.text();
+            const decrypted = CryptoJS.AES.decrypt(text, ENCRYPTION_KEY);
+            const typedArray = convertWordArrayToUint8Array(decrypted);
+            return new Blob([typedArray]);
+        }
     };
 
     const convertWordArrayToUint8Array = (wordArray: CryptoJS.lib.WordArray) => {
