@@ -1,4 +1,5 @@
 {
+  "homepage": "https://Akramyoonos.github.io/A7-Vault",
   "name": "cloud-vault",
   "version": "0.1.0",
   "private": true,
@@ -6,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d out"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

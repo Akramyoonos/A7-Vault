@@ -325,7 +325,7 @@ export default function DashboardView() {
             <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto glass-panel p-4 rounded-xl">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md overflow-hidden">
-                        <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+                        <img src="/A7-Vault/logo.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-200 to-purple-200">
